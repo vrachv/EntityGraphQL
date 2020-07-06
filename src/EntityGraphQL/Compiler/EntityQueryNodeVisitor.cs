@@ -17,8 +17,7 @@ namespace EntityGraphQL.Compiler
         private ExpressionResult currentContext;
         private readonly ISchemaProvider schemaProvider;
         private readonly IMethodProvider methodProvider;
-        private readonly QueryVariables variables;
-        private readonly ConstantVisitor constantVisitor = new ConstantVisitor();
+        private readonly ConstantVisitor constantVisitor;
 
         public EntityQueryNodeVisitor(Expression expression, ISchemaProvider schemaProvider, IMethodProvider methodProvider, QueryVariables variables, ClaimsIdentity claims)
         {
@@ -26,7 +25,7 @@ namespace EntityGraphQL.Compiler
             currentContext = (ExpressionResult)expression;
             this.schemaProvider = schemaProvider;
             this.methodProvider = methodProvider;
-            this.variables = variables;
+            this.constantVisitor = new ConstantVisitor(schemaProvider);
         }
 
         public override ExpressionResult VisitBinary(EntityGraphQLParser.BinaryContext context)
@@ -111,7 +110,7 @@ namespace EntityGraphQL.Compiler
         public override ExpressionResult VisitIdentity(EntityGraphQLParser.IdentityContext context)
         {
             var field = context.GetText();
-            string name = schemaProvider.GetSchemaTypeNameForClrType(currentContext.Type);
+            string name = schemaProvider.GetSchemaTypeNameForDotnetType(currentContext.Type);
             if (!schemaProvider.TypeHasField(name, field, null, claims))
             {
                 throw new EntityGraphQLCompilerException($"Field {field} not found on type {name}");

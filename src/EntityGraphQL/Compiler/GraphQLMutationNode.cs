@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading.Tasks;
 using EntityGraphQL.Compiler.Util;
 using EntityGraphQL.Extensions;
 using EntityGraphQL.Schema;
@@ -15,9 +16,9 @@ namespace EntityGraphQL.Compiler
         private readonly Dictionary<string, ExpressionResult> args;
         private readonly GraphQLQueryNode resultSelection;
 
-        public string Name { get => resultSelection.Name; set => throw new NotImplementedException(); }
+        public string Name { get => mutationType.Name; set => throw new NotImplementedException(); }
 
-        public IReadOnlyDictionary<ParameterExpression, object> ConstantParameters => resultSelection.ConstantParameters;
+        public IReadOnlyDictionary<ParameterExpression, object> ConstantParameters => resultSelection?.ConstantParameters ?? new Dictionary<ParameterExpression, object>();
 
         public GraphQLMutationNode(MutationType mutationType, Dictionary<string, ExpressionResult> args, GraphQLQueryNode resultSelection)
         {
@@ -31,11 +32,11 @@ namespace EntityGraphQL.Compiler
             throw new NotImplementedException();
         }
 
-        private object ExecuteMutation<TContext>(TContext context, IServiceProvider serviceProvider)
+        private async Task<object> ExecuteMutationAsync<TContext>(TContext context, GraphQLValidator validator, IServiceProvider serviceProvider)
         {
             try
             {
-                return mutationType.Call(context, args, serviceProvider);
+                return await mutationType.CallAsync(context, args, validator, serviceProvider);
             }
             catch (EntityQuerySchemaException e)
             {
@@ -50,10 +51,12 @@ namespace EntityGraphQL.Compiler
         /// <param name="serviceProvider">A service provider to look up any dependencies</param>
         /// <typeparam name="TContext"></typeparam>
         /// <returns></returns>
-        public override object Execute<TContext>(TContext context, IServiceProvider serviceProvider)
+        public override async Task<object> ExecuteAsync<TContext>(TContext context, GraphQLValidator validator, IServiceProvider serviceProvider)
         {
             // run the mutation to get the context for the query select
-            var result = ExecuteMutation(context, serviceProvider);
+            var result = await ExecuteMutationAsync(context, validator, serviceProvider);
+            if (result == null)
+                return null;
             if (typeof(LambdaExpression).IsAssignableFrom(result.GetType()))
             {
                 var mutationLambda = (LambdaExpression)result;
@@ -123,11 +126,15 @@ namespace EntityGraphQL.Compiler
 
                 // make sure we use the right parameter
                 resultSelection.FieldParameter = mutationContextParam;
-                result = resultSelection.Execute(context, serviceProvider);
+                result = await resultSelection.ExecuteAsync(context, validator, serviceProvider);
                 return result;
             }
+
+            if (resultSelection == null) // mutation must return a scalar type
+                return result;
+
             // run the query select
-            result = resultSelection.Execute(result, serviceProvider);
+            result = await resultSelection.ExecuteAsync(result, validator, serviceProvider);
             return result;
         }
 

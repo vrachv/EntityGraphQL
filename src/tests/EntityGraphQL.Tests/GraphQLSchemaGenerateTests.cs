@@ -18,7 +18,8 @@ namespace EntityGraphQL.Tests
         {
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"query Test { movies { id } }",
             };
             dynamic results = schemaProvider.ExecuteQuery(gql, new IgnoreTestSchema(), null, null).Errors;
@@ -30,7 +31,8 @@ namespace EntityGraphQL.Tests
         {
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"query Test { albums { id } }",
             };
             var results = schemaProvider.ExecuteQuery(gql, new IgnoreTestSchema(), null, null);
@@ -43,7 +45,8 @@ namespace EntityGraphQL.Tests
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             schemaProvider.AddMutationFrom(new IgnoreTestMutations());
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"mutation Test($name: String, $hiddenInputField: String) {
   addAlbum(name: $name, hiddenInputField: $hiddenInputField) {
     id
@@ -65,7 +68,8 @@ namespace EntityGraphQL.Tests
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             schemaProvider.AddMutationFrom(new IgnoreTestMutations());
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"mutation Test($name: String) {
   addAlbum(name: $name) {
     id name hiddenInputField
@@ -88,7 +92,8 @@ namespace EntityGraphQL.Tests
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             schemaProvider.AddMutationFrom(new IgnoreTestMutations());
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"mutation Test($name: String, $hiddenField: String) {
   addAlbum(name: $name, hiddenField: $hiddenField) {
     id
@@ -109,13 +114,14 @@ namespace EntityGraphQL.Tests
         {
             var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>(false);
             // Add a argument field with a require parameter
-            var gql = new QueryRequest {
+            var gql = new QueryRequest
+            {
                 Query = @"query Test {
   albums {
     id hiddenInputField hiddenField
   }
 }",
-                Variables = new QueryVariables {}
+                Variables = new QueryVariables { }
             };
             var results = schemaProvider.ExecuteQuery(gql, new IgnoreTestSchema(), null, null);
             var error = results.Errors.First();
@@ -133,6 +139,15 @@ namespace EntityGraphQL.Tests
             Assert.Contains("type Album {\n\tid: Int!\n\tname: String!\n\thiddenInputField: String\n\tgenre: Genre!\n}", schema);
             // doesn't include the hidden input fields
             Assert.Contains("addAlbum(id: Int!, name: String!, genre: Genre!): Album", schema);
+        }
+
+        [Fact]
+        public void TestMutationWithListReturnType()
+        {
+            var schemaProvider = SchemaBuilder.FromObject<IgnoreTestSchema>();
+            schemaProvider.AddMutationFrom(new IgnoreTestMutations());
+            var schema = schemaProvider.GetGraphQLSchema();
+            Assert.Contains("addAlbum2(id: Int!, name: String!, genre: Genre!): [Album!]", schema);
         }
 
         [Fact]
@@ -194,6 +209,18 @@ namespace EntityGraphQL.Tests
             db.Albums.Add(newAlbum);
             return ctx => ctx.Albums.First(a => a.Id == newAlbum.Id);
         }
+
+        [GraphQLMutation("Test correct generation of return type for a list")]
+        public Expression<Func<IgnoreTestSchema, IEnumerable<Album>>> AddAlbum2(IgnoreTestSchema db, Album args)
+        {
+            var newAlbum = new Album
+            {
+                Id = new Random().Next(100),
+                Name = args.Name,
+            };
+            db.Albums.Add(newAlbum);
+            return ctx => ctx.Albums;
+        }
     }
 
     public class MovieArgs
@@ -230,6 +257,7 @@ namespace EntityGraphQL.Tests
         Pop
     }
 
+    [MutationArguments]
     public class Album
     {
         public int Id { get; set; }
@@ -239,6 +267,7 @@ namespace EntityGraphQL.Tests
         public string HiddenInputField { get; set; }
         [GraphQLIgnore(GraphQLIgnoreType.All)] // default
         public string HiddenAllField { get; set; }
+        [GraphQLNotNull]
         public Genre Genre { get; set; }
     }
 

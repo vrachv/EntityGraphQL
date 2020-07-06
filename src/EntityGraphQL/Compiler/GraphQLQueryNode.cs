@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 using EntityGraphQL.Compiler.Util;
 using EntityGraphQL.Extensions;
 using EntityGraphQL.Schema;
@@ -152,13 +152,17 @@ namespace EntityGraphQL.Compiler
                             {
                                 constantParameters.Add(item.Key, item.Value);
                             }
+                            // pull up any services
+                            AddServices(fieldExp.Services);
                         }
                     }
                     else
                     {
                         selectionFields.Add(field);
+                        AddServices(field.GetNodeExpression().Services);
                     }
                 }
+
                 if (isSelectOnList)
                 {
                     // build a .Select(...) - returning a list<>
@@ -190,6 +194,7 @@ namespace EntityGraphQL.Compiler
                     exp.AddServices(nodeExpression.Services);
                     nodeExpression = exp;
                 }
+                nodeExpression.AddServices(services);
                 return nodeExpression;
             }
             else if (nodeExpression != null && nodeFields != null && nodeFields.Any())
@@ -204,7 +209,7 @@ namespace EntityGraphQL.Compiler
             nodeExpression = expr;
         }
 
-        public override object Execute<TContext>(TContext context, IServiceProvider serviceProvider)
+        public override Task<object> ExecuteAsync<TContext>(TContext context, GraphQLValidator validator, IServiceProvider serviceProvider)
         {
             var allArgs = new List<object> { context };
 
@@ -254,7 +259,7 @@ namespace EntityGraphQL.Compiler
             }
 
             var lambdaExpression = Expression.Lambda(expression, parameters.ToArray());
-            return lambdaExpression.Compile().DynamicInvoke(allArgs.ToArray());
+            return Task.FromResult(lambdaExpression.Compile().DynamicInvoke(allArgs.ToArray()));
         }
 
         public void AddConstantParameters(IReadOnlyDictionary<ParameterExpression, object> constantParameters)

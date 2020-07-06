@@ -19,7 +19,6 @@ namespace EntityGraphQL.Schema
     {
         /// The base context type that expression will be built from. For example your DbContext
         Type ContextType { get; }
-        IEnumerable<string> CustomScalarTypes { get; }
 
         /// Checks if the given type has the given field identifier
         bool TypeHasField(string typeName, string identifier, IEnumerable<string> fieldArgs, ClaimsIdentity claims);
@@ -28,6 +27,8 @@ namespace EntityGraphQL.Schema
         bool HasType(string typeName);
         bool HasType(Type type);
         ISchemaType Type(string name);
+        ISchemaType Type(Type dotnetType);
+        List<ISchemaType> EnumTypes();
         /// As EQL is not case sensitive this returns the actual field name in correct casing as defined to build the expression
         string GetActualFieldName(string typeName, string identifier, ClaimsIdentity claims);
 
@@ -40,8 +41,14 @@ namespace EntityGraphQL.Schema
         /// <param name="args"></param>
         /// <returns></returns>
         ExpressionResult GetExpressionForField(Expression context, string typeName, string fieldName, Dictionary<string, ExpressionResult> args, ClaimsIdentity claims);
-        string GetSchemaTypeNameForClrType(Type type);
-        IMethodType GetFieldOnContext(Expression context, string fieldName, ClaimsIdentity claims);
+        IEnumerable<ISchemaType> GetScalarTypes();
+        /// <summary>
+        /// Get the GQL (from schema) type name for a given CLR/dotnet type. Examples int -> Int, int? -> Int
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        string GetSchemaTypeNameForDotnetType(Type type);
+        IField GetFieldOnContext(Expression context, string fieldName, ClaimsIdentity claims);
         bool HasMutation(string method);
         string GetGraphQLSchema();
         /// <summary>
@@ -62,8 +69,16 @@ namespace EntityGraphQL.Schema
         /// </summary>
         /// <param name="clrType">A CLR type that you want mapped</param>
         /// <param name="gqlTypeName">A type name for the scala</param>
-        void AddCustomScalarType(Type clrType, string gqlTypeName, bool required = false);
+        [Obsolete("Use AddScalarType")]
+        void AddCustomScalarType(Type clrType, string gqlTypeName, string description, bool required = false);
+        [Obsolete("Use AddScalarType")]
+        void AddCustomScalarType<TType>(string gqlTypeName, string description, bool required = false);
+        ISchemaType AddScalarType(Type clrType, string gqlTypeName, string description);
+        ISchemaType AddScalarType<TType>(string gqlTypeName, string description);
         ISchemaType AddEnum(string name, Type type, string description);
+
+        ISchemaProvider RemoveType<TType>();
+        ISchemaProvider RemoveType(string schemaType);
         /// <summary>
         /// Get a directive by name. A directive is used to manipulate or customise a query and/or result
         /// </summary>
@@ -71,5 +86,7 @@ namespace EntityGraphQL.Schema
         /// <returns></returns>
         IDirectiveProcessor GetDirective(string name);
         void AddDirective(string name, IDirectiveProcessor directive);
+        IEnumerable<IDirectiveProcessor> GetDirectives();
+        GqlTypeInfo GetCustomTypeMapping(Type dotnetType);
     }
 }
